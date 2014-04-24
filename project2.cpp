@@ -25,9 +25,10 @@ int score = 0;
 struct collisionInfo{
 	bool isColliding;
 	bool isComingFromPaddle;
-	float location;	//location of collision on paddle
+	float locationX;	//location of collision on paddle
+	float locationY;	//location of collision on paddle
 
-	collisionInfo() : isColliding(false), isComingFromPaddle(false), location(0.0) {}
+	collisionInfo() : isColliding(false), isComingFromPaddle(false), locationX(0.0), locationY(0.0) {}
 	
 } collision;
 
@@ -42,7 +43,7 @@ mat4 modelP, modelB;
 
 // Create camera view variables
 point4 at( 0.0, 0.0, 0.0, 1.0 );
-point4 eye( 0.0, 0.0, 8.0, 1.0 );
+point4 eye( 0.0, 0.0, 7.0, 1.0 );
 vec4   up( 0.0, 1.0, 0.0, 0.0 );
 
 GLfloat positionArray[]={
@@ -77,12 +78,11 @@ GLubyte elemsArray[]={
 	0,1,2,3
 };
 
-// Define Constants
+// Define geometric Constants
 GLuint NumVerticies = 4;
-GLuint BallHeight = 1;
-GLuint BallWidth = 1;
-GLuint PaddleHeight = 6;
-GLuint PaddleWidth = 1;
+GLfloat BallRad = 0.5;
+GLuint PaddleHeight = 4;
+GLuint PaddleWidth = 4;
 
 //----------------------------------------------------------------------------
 
@@ -200,9 +200,11 @@ void printMat4(mat4 m){
 void resetGame(){
 	collision.isColliding = false;
 	collision.isComingFromPaddle = false;
-	collision.location = 0.0;
+	collision.locationX = 0.0;
+	collision.locationY = 0.0;
 	modelB = identity();
 	ballVel = VelInitial;
+	score = 0;
 	updateBallPosition(true);
 }
 
@@ -244,10 +246,14 @@ void display( SDL_Window* screen ){
 void input(SDL_Window* screen ){
 
 	SDL_Event event;
-	float paddleX = modelP[0][3];
-	float paddleY = modelP[1][3];
 
 	while (SDL_PollEvent(&event)){//Handling the keyboard
+		// Debug
+		//std::cout<<"modelP="<<std::endl;
+		//printMat4(modelP);
+		//std::cout<<"Paddle="<<modelP[0][3]<<" "<<modelP[1][3]<<std::endl;
+		//std::cout<<std::endl;
+		// !Debug
 		switch (event.type){
 		case SDL_QUIT:
 			exit(0);
@@ -256,42 +262,30 @@ void input(SDL_Window* screen ){
 			case SDLK_ESCAPE:
 				exit(0);
 			case SDLK_w:	//paddle up
-				if (paddleY < 7.0) {
+				if (modelP[1][3] < 6.5) {
 					modelP = modelP * Translate(0.0,1.0,0.0);
 				}
-				//std::cout<<"modelP="<<std::endl;
-				//printMat4(modelP);
-				//std::cout<<std::endl;
 				break;
 			case SDLK_s:	//paddle down;
-				if (paddleY > -7.0) {
+				if (modelP[1][3] > -6.5) {
 					modelP = modelP * Translate(0.0,-1.0,0.0);
 				}
-				//std::cout<<"modelP="<<std::endl;
-				//printMat4(modelP);
-				//std::cout<<std::endl;
 				break;
 			case SDLK_d:	//paddle right;
-				if (paddleX < 7.0) {
+				if (modelP[0][3] < 9.5) {
 					modelP = modelP * Translate(1.0,0.0,0.0);
 				}
-				//std::cout<<"modelP="<<std::endl;
-				//printMat4(modelP);
-				//std::cout<<std::endl;
 				break;
 			case SDLK_a:	//paddle left;
-				if (paddleX > -7.0) {
+				if (modelP[0][3] > -9.5) {
 					modelP = modelP * Translate(-1.0,0.0,0.0);
 				}
-				//std::cout<<"modelP="<<std::endl;
-				//printMat4(modelP);
-				//std::cout<<std::endl;
 				break;
 			case SDLK_r://new game
 				std::cout<<"*new game*"<<std::endl;
 				score = 0;
 				modelP = identity();
-				modelP = modelP * Translate(0.0,0.0,-10.0);
+				modelP = modelP * Translate(PaddlePosInitial);
 				resetGame();
 				break;
 			}
@@ -303,20 +297,23 @@ void input(SDL_Window* screen ){
 
 collisionInfo detectCollision(){
 	// Get positions
-	int ballLx, ballRx, paddleLx, paddleRx;
-	ballLx = 10.0*(modelB[0][3] - BallWidth/2.0);
-	ballRx = 10.0*(modelB[0][3] + BallWidth/2.0);
+	int ballLx, ballRx, ballBy, ballTy, paddleLx, paddleRx, paddleBy, paddleTy;
+	ballLx = 10.0*(modelB[0][3] - BallRad);
+	ballRx = 10.0*(modelB[0][3] + BallRad);
+	ballBy = 10.0*(modelB[1][3] - BallRad);
+	ballTy = 10.0*(modelB[1][3] + BallRad);
 	paddleLx = 10.0*(modelP[0][3] - PaddleWidth/2.0);
 	paddleRx = 10.0*(modelP[0][3] + PaddleWidth/2.0);
+	paddleBy = 10.0*(modelP[1][3] - PaddleHeight/2.0);
+	paddleTy = 10.0*(modelP[1][3] + PaddleHeight/2.0);
 
-	float ballCy, paddleCy;
-	ballCy = modelB[1][3];
-	paddleCy = modelP[1][3];
+	vec3 ballPos(modelB[0][3], modelB[1][3], modelB[2][3]);
+	vec3 paddlePos(modelP[0][3], modelP[1][3], modelP[2][3]);
 
 	// Check for collision with paddle
 	if (ballLx >= paddleLx && ballLx <= paddleRx){
-		float heightOfImpact = ballCy - paddleCy;
-		if (abs(heightOfImpact) < ((PaddleHeight+BallHeight)/2)){
+		float heightOfImpact = ballPos.y - paddlePos.y;
+		if (abs(heightOfImpact) < ((PaddleHeight+BallRad)/2.0)){
 			collision.isColliding=true;
 			collision.isComingFromPaddle=true;
 			collision.location=heightOfImpact;
@@ -332,14 +329,17 @@ collisionInfo detectCollision(){
 //----------------------------------------------------------------------------
 
 void updateScore(){
-	int ballPositionX = 10.0*(modelB[0][3]);
-	int leftWall = -130;
-	int rightWall = 130;
-	// Player 1 scores
-	if (ballPositionX >= rightWall){
+	int ballPositionZ = 10.0*(modelB[2][3]);
+	int backWall = 60.0;
+	
+	// Player hit the ball
+	if (collision.isColliding && collision.isComingFromPaddle){
 		score++;
-		std::cout<<"Player scored!"<<std::endl;
-		std::cout<<"Score is "<<score<<std::endl;
+		std::cout<<"Score: "<<score<<std::endl;
+	}
+	// Player loses
+	if (ballPositionZ >= backWall){
+		std::cout<<"Player missed with a score of "<<score<<"!"<<std::endl;
 		resetGame();
 	}
 }
@@ -347,8 +347,12 @@ void updateScore(){
 //----------------------------------------------------------------------------
 
 void updateSpeed(){
-	if (collision.isColliding && ballVel.z <= VelMaxZ){
-		ballVel.z = ballVel.z + VelIncrementZ;
+	// Player hits the ball
+	if (collision.isColliding && collision.isComingFromPaddle){
+		// Ball is not travelling at max speed
+		if (ballVel.z <= VelMaxZ) {
+			ballVel.z = ballVel.z + VelIncrementZ;
+		}
 	}
 }
 
@@ -365,8 +369,9 @@ vec3 calculateTrajectory(){
 		direction = -1;
 	}
 
-	t.x = direction*ballVel.z;
-	t.y = collision.location/8.0;
+	t.x = collision.locationX/8.0;
+	t.y = collision.locationY/8.0;
+	t.z = direction*ballVel.z;
 
 	return t;
 }
