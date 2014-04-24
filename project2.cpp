@@ -316,7 +316,7 @@ collisionInfo detectCollision(){
 		if (abs(heightOfImpact) < ((PaddleHeight+BallRad)/2.0)){
 			collision.isColliding=true;
 			collision.isComingFromPaddle=true;
-			collision.location=heightOfImpact;
+			collision.locationY=heightOfImpact;
 		}
 	} // No collision detected
 	else {
