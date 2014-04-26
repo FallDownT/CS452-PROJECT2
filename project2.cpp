@@ -271,6 +271,7 @@ void printMat4(mat4 m){
 //----------------------------------------------------------------------------
 
 void resetGame(){
+	modelP = identity() * Translate(PaddlePosInitial);
 	collision.isColliding = false;
 	collision.isComingFromPaddle = false;
 	collision.locationX = 0.0;
@@ -337,6 +338,7 @@ void input(SDL_Window* screen){
 		case SDL_KEYDOWN:
 			switch(event.key.keysym.sym){
 			case SDLK_ESCAPE:
+			case SDLK_q:
 				exit(EXIT_SUCCESS);
 			case SDLK_w:	//paddle up
 				if (modelP[1][3] < 6.5) {
@@ -359,7 +361,6 @@ void input(SDL_Window* screen){
 				}
 				break;
 			case SDLK_r://new game
-				modelP = identity() * Translate(PaddlePosInitial);
 				resetGame();
 				break;
 			}
@@ -396,7 +397,7 @@ void updateCollision(){
 		ballFz <= paddleFz && ballNz >= paddleNz &&
 		!collision.isComingFromPaddle){
 
-		std::cout<<"Collision with paddle"<<std::endl;
+		//std::cout<<"Collision with paddle"<<std::endl;
 		// Set collision info
 		collision.isColliding=true;
 		collision.isComingFromPaddle=true;
@@ -404,7 +405,7 @@ void updateCollision(){
 		collision.locationY = ballPos.y - paddlePos.y;
 	} // If collision with back wall
 	else if (ballFz <= wallPos.z && collision.isComingFromPaddle) {
-		std::cout<<"Collision with back wall"<<std::endl;
+		//std::cout<<"Collision with back wall"<<std::endl;
 		collision.isColliding=true;
 		collision.isComingFromPaddle=false;
 		collision.locationX = 0.0;
@@ -424,7 +425,7 @@ void updateCollision(){
 	if ((ballLx <= LeftWallX10 && ballVel.x < 0) ||
 		(ballRx >= RightWallX10 && ballVel.x > 0)){
 
-		std::cout<<"Collision with left/right wall"<<std::endl;
+		//std::cout<<"Collision with left/right wall"<<std::endl;
 		ballVel.x = -ballVel.x;
 	}
 	
@@ -432,8 +433,8 @@ void updateCollision(){
 	if ((ballBy <= FloorY10 && ballVel.y < 0) ||
 		(ballTy >= CeilingY10 && ballVel.y > 0)){
 
-		std::cout<<"Collision with floor/ceiling"<<std::endl;
-		printMat4(modelB);
+		//std::cout<<"Collision with floor/ceiling"<<std::endl;
+		//printMat4(modelB);
 		ballVel.y = -ballVel.y;
 	}
 }
@@ -452,12 +453,12 @@ void updateScore(){
 	// Player loses
 	if (ballPositionZ >= backWall){
 		std::cout<<"Player missed with a score of "<<score<<"!"<<std::endl;
+		resetGame();
 		//Debug-cts
-		//resetGame();
-		collision.isColliding=true;
-		collision.isComingFromPaddle=true;
-		collision.locationX = 0.0;
-		collision.locationY = 0.0;
+		//collision.isColliding=true;
+		//collision.isComingFromPaddle=true;
+		//collision.locationX = 0.0;
+		//collision.locationY = 0.0;
 		//Debug-cts
 	}
 }
