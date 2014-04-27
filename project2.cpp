@@ -74,10 +74,10 @@ GLfloat positionArray[]={
 
 GLfloat colorArray[]={
 	// Paddle
-	1.0,0.0,0.0,0.0,
-	1.0,0.0,0.0,0.0,
-	1.0,0.0,0.0,0.0,
-	1.0,0.0,0.0,0.0,
+	1.0,0.0,0.0,0.5,
+	1.0,0.0,0.0,0.5,
+	1.0,0.0,0.0,0.5,
+	1.0,0.0,0.0,0.5,
 
 	// Wall
 	0.0,0.0,1.0,0.0,
@@ -255,8 +255,13 @@ void init()
 	ballVel.z = VelInitial.z;
     
     glEnable( GL_DEPTH_TEST );
+	glDisable(GL_CULL_FACE);
+
+	
+
     
-    glClearColor( 0.0, 0.0, 0.0, 1.0 ); // black background 
+    glClearColor( 0.0, 0.0, 0.0, 1.0 ); // black background
+//	glClearColor( 1.0, 1.0, 1.0, 1.0 ); // black background 
 }
 
 //----------------------------------------------------------------------------
@@ -290,6 +295,19 @@ void display( SDL_Window* screen ){
 	// Define view
     mat4 view = LookAt( eye, at, up );
 
+	// Draw elements of vaoB
+	glUseProgram( programB );
+	glBindVertexArray( vaoB );
+    glUniformMatrix4fv( mMatrix, 1, GL_TRUE, modelB );
+    glUniformMatrix4fv( vMatrix, 1, GL_TRUE, view );
+    glDrawElements( GL_TRIANGLE_FAN,sizeof(elemsArray),GL_UNSIGNED_BYTE,0 );
+	glBindVertexArray( 0 );
+	glUseProgram( 0 );
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDepthMask(0);
+	
 	// Draw elements of vaoP
 	glUseProgram( programP );
 	glBindVertexArray( vaoP );
@@ -308,14 +326,8 @@ void display( SDL_Window* screen ){
 	glBindVertexArray( 0 );
 	glUseProgram( 0 );
 
-	// Draw elements of vaoB
-	glUseProgram( programB );
-	glBindVertexArray( vaoB );
-    glUniformMatrix4fv( mMatrix, 1, GL_TRUE, modelB );
-    glUniformMatrix4fv( vMatrix, 1, GL_TRUE, view );
-    glDrawElements( GL_TRIANGLE_FAN,sizeof(elemsArray),GL_UNSIGNED_BYTE,0 );
-	glBindVertexArray( 0 );
-	glUseProgram( 0 );
+	glDisable(GL_BLEND);
+	glDepthMask(1);
 
 	// Release binds and swap buffers
 	glBindVertexArray( 0 );
@@ -517,6 +529,7 @@ void reshape( int width, int height ){
     }
 
     mat4 projection = Ortho( left, right, bottom, top, zNear, zFar );
+	//mat4 projection = Frustum( left, right, bottom, top, zNear, zFar );
 
 	// Bind new projection to each program
 	glUseProgram( programP );
