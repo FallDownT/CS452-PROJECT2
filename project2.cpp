@@ -13,16 +13,20 @@ typedef Angel::vec4 point4;
 typedef Angel::vec4 color4;
 
 // Constants
-vec3 PaddlePosInitial(0.0,0.0,5.0);
-vec3 WallPosInitial(0.0,0.0,-5.0);
-vec3 BallPosInitial(0.0,0.0,0.0);
+vec3 PaddlePosInitial(0.0,0.0,-3.0);
+vec3 WallPosInitial(0.0,0.0,-13.0);
+vec3 BallPosInitial(0.0,0.0,-8.0);
+
 vec3 VelInitial(-0.1,-0.1,0.2);
 float VelIncrementZ = 0.04;
 float VelMaxZ = 1.2;
-float LeftWallX10 = -100.0;
-float RightWallX10 = 100.0;
-float FloorY10 = -70.0;
-float CeilingY10 = 70.0;
+
+float LeftWallX = -10.0;
+float RightWallX = 10.0;
+float FloorY = -7.0;
+float CeilingY = 7.0;
+float FloatImprecisionFactor = 0.25;
+
 float DeflectionReductionFactor = 8.0;
 int MsPerFrame = 50;
 int WindowWidth = 768;
@@ -48,8 +52,8 @@ GLuint programP, programW, programB;
 mat4 modelP, modelW, modelB;
 
 // Create camera view variables
-point4 at( 0.0, 0.0, 0.0, 1.0 );
-point4 eye( 0.0, 0.0, 7.0, 1.0 );
+point4 at( 0.0, 0.0, -1.0, 1.0 );
+point4 eye( 0.0, 0.0, 0.0, 1.0 );
 vec4   up( 0.0, 1.0, 0.0, 0.0 );
 
 GLfloat positionArray[]={
@@ -257,11 +261,7 @@ void init()
     glEnable( GL_DEPTH_TEST );
 	glDisable(GL_CULL_FACE);
 
-	
-
-    
     glClearColor( 0.0, 0.0, 0.0, 1.0 ); // black background
-//	glClearColor( 1.0, 1.0, 1.0, 1.0 ); // black background 
 }
 
 //----------------------------------------------------------------------------
@@ -276,14 +276,20 @@ void printMat4(mat4 m){
 //----------------------------------------------------------------------------
 
 void resetGame(){
-	modelP = identity() * Translate(PaddlePosInitial);
+	// Reset collision struct
 	collision.isColliding = false;
 	collision.isComingFromPaddle = false;
 	collision.locationX = 0.0;
 	collision.locationY = 0.0;
-	modelB = identity();
-	ballVel = VelInitial;
+
+	// Reset score
 	score = 0;
+
+	// Reset vao models
+	modelP = identity() * Translate(PaddlePosInitial);
+	modelW = identity() * Translate(WallPosInitial);
+	modelB = identity() * Translate(BallPosInitial);
+	ballVel = VelInitial;
 	updateBallPosition(true);
 }
 
@@ -353,22 +359,22 @@ void input(SDL_Window* screen){
 			case SDLK_q:
 				exit(EXIT_SUCCESS);
 			case SDLK_w:	//paddle up
-				if (modelP[1][3] < 6.5) {
+				if (modelP[1][3] < CeilingY - FloatImprecisionFactor) {
 					modelP = modelP * Translate(0.0,1.0,0.0);
 				}
 				break;
 			case SDLK_s:	//paddle down;
-				if (modelP[1][3] > -6.5) {
+				if (modelP[1][3] > FloorY + FloatImprecisionFactor) {
 					modelP = modelP * Translate(0.0,-1.0,0.0);
 				}
 				break;
 			case SDLK_d:	//paddle right;
-				if (modelP[0][3] < 9.5) {
+				if (modelP[0][3] < RightWallX - FloatImprecisionFactor) {
 					modelP = modelP * Translate(1.0,0.0,0.0);
 				}
 				break;
 			case SDLK_a:	//paddle left;
-				if (modelP[0][3] > -9.5) {
+				if (modelP[0][3] > LeftWallX + FloatImprecisionFactor) {
 					modelP = modelP * Translate(-1.0,0.0,0.0);
 				}
 				break;
@@ -384,20 +390,20 @@ void input(SDL_Window* screen){
 
 void updateCollision(){
 	// Get positions
-	int paddleLx, paddleRx, paddleBy, paddleTy, paddleFz, paddleNz;
-	int ballLx, ballRx, ballBy, ballTy, ballFz, ballNz;
-	paddleLx = 10.0*(modelP[0][3] - PaddleWidth/2.0);
-	paddleRx = 10.0*(modelP[0][3] + PaddleWidth/2.0);
-	paddleBy = 10.0*(modelP[1][3] - PaddleHeight/2.0);
-	paddleTy = 10.0*(modelP[1][3] + PaddleHeight/2.0);
-	paddleFz = 10.0*(modelP[2][3]);
-	paddleNz = 10.0*(modelP[2][3]);
-	ballLx = 10.0*(modelB[0][3] - BallRadius);
-	ballRx = 10.0*(modelB[0][3] + BallRadius);
-	ballBy = 10.0*(modelB[1][3] - BallRadius);
-	ballTy = 10.0*(modelB[1][3] + BallRadius);
-	ballFz = 10.0*(modelB[2][3] - BallRadius);
-	ballNz = 10.0*(modelB[2][3] + BallRadius);
+	float paddleLx, paddleRx, paddleBy, paddleTy, paddleFz, paddleNz;
+	float ballLx, ballRx, ballBy, ballTy, ballFz, ballNz;
+	paddleLx = modelP[0][3] - PaddleWidth/2.0;
+	paddleRx = modelP[0][3] + PaddleWidth/2.0;
+	paddleBy = modelP[1][3] - PaddleHeight/2.0;
+	paddleTy = modelP[1][3] + PaddleHeight/2.0;
+	paddleFz = modelP[2][3];
+	paddleNz = modelP[2][3];
+	ballLx = modelB[0][3] - BallRadius;
+	ballRx = modelB[0][3] + BallRadius;
+	ballBy = modelB[1][3] - BallRadius;
+	ballTy = modelB[1][3] + BallRadius;
+	ballFz = modelB[2][3] - BallRadius;
+	ballNz = modelB[2][3] + BallRadius;
 
 	vec3 paddlePos(modelP[0][3], modelP[1][3], modelP[2][3]);
 	vec3 wallPos(modelW[0][3], modelW[1][3], modelW[2][3]);
@@ -418,6 +424,8 @@ void updateCollision(){
 	} // If collision with back wall
 	else if (ballFz <= wallPos.z && collision.isComingFromPaddle) {
 		//std::cout<<"Collision with back wall"<<std::endl;
+		// Set collision info
+
 		collision.isColliding=true;
 		collision.isComingFromPaddle=false;
 		collision.locationX = 0.0;
@@ -434,16 +442,16 @@ void updateCollision(){
 	/////////////////////////////////////////////////////////
 
 	// Check for left/right wall collision 
-	if ((ballLx <= LeftWallX10 && ballVel.x < 0) ||
-		(ballRx >= RightWallX10 && ballVel.x > 0)){
+	if ((ballLx <= LeftWallX && ballVel.x < 0) ||
+		(ballRx >= RightWallX && ballVel.x > 0)){
 
 		//std::cout<<"Collision with left/right wall"<<std::endl;
 		ballVel.x = -ballVel.x;
 	}
 	
 	// Check for floor/ceiling collision 
-	if ((ballBy <= FloorY10 && ballVel.y < 0) ||
-		(ballTy >= CeilingY10 && ballVel.y > 0)){
+	if ((ballBy <= LeftWallX && ballVel.y < 0) ||
+		(ballTy >= RightWallX && ballVel.y > 0)){
 
 		//std::cout<<"Collision with floor/ceiling"<<std::endl;
 		//printMat4(modelB);
@@ -454,8 +462,10 @@ void updateCollision(){
 //----------------------------------------------------------------------------
 
 void updateScore(){
-	int ballPositionZ = 10.0*(modelB[2][3]);
-	int backWall = 60.0;
+	float GoalDepthZ = 1.0;
+
+	float ballPositionZ = modelB[2][3];
+	float missWall = modelP[2][3] + GoalDepthZ;
 	
 	// Player hit the ball
 	if (collision.isColliding && collision.isComingFromPaddle){
@@ -463,7 +473,7 @@ void updateScore(){
 		std::cout<<"Score: "<<score<<std::endl;
 	}
 	// Player loses
-	if (ballPositionZ >= backWall){
+	if (ballPositionZ >= missWall){
 		std::cout<<"Player missed with a score of "<<score<<"!"<<std::endl;
 		resetGame();
 		//Debug-cts
@@ -516,7 +526,7 @@ void reshape( int width, int height ){
 
     GLfloat left = -10.0, right = 10.0;
     GLfloat top = 10.0, bottom = -10.0;
-    GLfloat zNear = -10.0, zFar = 10.0;
+    GLfloat zNear = -10.0, zFar = 20.0;
 
     GLfloat aspect = GLfloat(width)/height;
 
