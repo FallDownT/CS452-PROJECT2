@@ -42,7 +42,7 @@ struct collisionInfo{
 	float locationY;	//location of collision on paddle
 
 	collisionInfo() : isColliding(false), isComingFromPaddle(false), locationX(0.0), locationY(0.0) {}
-	
+
 } collision;
 
 // Model and view matrices uniform location
@@ -84,10 +84,10 @@ GLfloat colorArray[]={
 	1.0,0.0,0.0,0.5,
 
 	// Wall
-	0.0,0.0,1.0,0.0,
-	0.0,0.0,1.0,0.0,
-	0.0,0.0,1.0,0.0,
-	0.0,0.0,1.0,0.0,
+	0.0,0.0,1.0,1.0,
+	0.0,0.0,1.0,1.0,
+	0.0,0.0,1.0,1.0,
+	0.0,0.0,1.0,1.0,
 
 	// Ball
 	1.0f,1.0f,0.0f,1.0f,
@@ -95,7 +95,7 @@ GLfloat colorArray[]={
 	0.0f,1.0f,1.0f,1.0f,
 	1.0f,0.0f,1.0f,1.0f
 };
-											
+
 GLubyte elemsArray[]={
 	0,1,2,3
 };
@@ -103,8 +103,8 @@ GLubyte elemsArray[]={
 // Define geometric Constants
 GLuint NumVerticies = 4;
 GLfloat BallRadius = 0.5;
-GLuint PaddleHeight = 4;
-GLuint PaddleWidth = 4;
+GLfloat PaddleHeight = 4.0;
+GLfloat PaddleWidth = 4.0;
 
 // Functional Prototypes
 void init( );
@@ -119,34 +119,34 @@ void updateBallPosition( bool );
 void reshape( int, int );
 
 // -----------------------------------------------
-// -------------- F U N C T I O N S -------------- 
+// -------------- F U N C T I O N S --------------
 // -----------------------------------------------
 
 // OpenGL initialization
 void init()
 {
-    // Load shaders and use the resulting shader program
-    programP = InitShader( "vshaderP.glsl", "fshader.glsl" );
-    programW = InitShader( "vshaderW.glsl", "fshader.glsl" );
-    programB = InitShader( "vshaderB.glsl", "fshader.glsl" );
+	// Load shaders and use the resulting shader program
+	programP = InitShader( "vshaderP.glsl", "fshader.glsl" );
+	programW = InitShader( "vshaderW.glsl", "fshader.glsl" );
+	programB = InitShader( "vshaderB.glsl", "fshader.glsl" );
 
 	// Define data members
-    GLuint vbo;
+	GLuint vbo;
 	size_t posDataOffset, colorDataOffset;
 
 	// ------------------------------------------------------------------------
-	// -------  V E R T E X    A R R A Y    O B J E C T    P A D D L E  -------
+	// -------  V E R T E X   A R R A Y   O B J E C T   P A D D L E  -------
 	// ------------------------------------------------------------------------
 	// Define offsets and sizes
 	posDataOffset = 0;
 	colorDataOffset = sizeof(positionArray);
 
 	// Use programP
-    glUseProgram( programP );
+	glUseProgram( programP );
 
-    // Generate and bind new vertex array object
-    glGenVertexArrays( 1,&vaoP );
-    glBindVertexArray( vaoP );
+	// Generate and bind new vertex array object
+	glGenVertexArrays( 1,&vaoP );
+	glBindVertexArray( vaoP );
 
 	// Generate and bind new vertex buffer object and populate the buffer
 	glGenBuffers( 1,&vbo );
@@ -158,12 +158,12 @@ void init()
 	// Bind position attribute of vbo
 	GLuint in_position = glGetAttribLocation( programP, "in_position" );
 	glVertexAttribPointer( in_position,3,GL_FLOAT,GL_FALSE,0,BUFFER_OFFSET(posDataOffset) );
-    glEnableVertexAttribArray( in_position );
+	glEnableVertexAttribArray( in_position );
 
 	// Bind color attribute of vbo
 	GLuint in_color = glGetAttribLocation( programP, "in_color" );
 	glVertexAttribPointer( in_color,4,GL_FLOAT,GL_FALSE,0,BUFFER_OFFSET(colorDataOffset) );
-    glEnableVertexAttribArray( in_color );
+	glEnableVertexAttribArray( in_color );
 
 	// Generate and bind element buffer object
 	glGenBuffers( 1,&eboP );
@@ -176,28 +176,30 @@ void init()
 	// --------------------------------------------------------------------
 
 	// --------------------------------------------------------------------
-	// -------  V E R T E X    A R R A Y    O B J E C T    W A L L  -------
+	// -------  V E R T E X   A R R A Y   O B J E C T   W A L L  -------
 	// --------------------------------------------------------------------
 	// Define new offsets
 	posDataOffset += sizeof(GLfloat) * 3 * NumVerticies;
 	colorDataOffset += sizeof(GLfloat) * 4 * NumVerticies;
 
 	// Use programW
-    glUseProgram( programW );
+	glUseProgram( programW );
 
-    // Generate new vertex array object
-    glGenVertexArrays( 1,&vaoW );
-    glBindVertexArray( vaoW );
+	// Generate new vertex array object
+	glGenVertexArrays( 1,&vaoW );
+	glBindVertexArray( vaoW );
 
 	// Bind vertex buffer object
 	// --Use same vbo as vaoP (no new buffer has been bound)
 	
-    // Bind attributes to vertex array
+	// Bind attributes to vertex array
+	in_position = glGetAttribLocation( programW, "in_position" );
 	glVertexAttribPointer(in_position,3,GL_FLOAT,GL_FALSE,0,BUFFER_OFFSET(posDataOffset));
-    glEnableVertexAttribArray( in_position );
+	glEnableVertexAttribArray( in_position );
 
+	in_color = glGetAttribLocation( programW, "in_color" );
 	glVertexAttribPointer(in_color,4,GL_FLOAT,GL_FALSE,0,BUFFER_OFFSET(colorDataOffset));
-    glEnableVertexAttribArray( in_color );
+	glEnableVertexAttribArray( in_color );
 
 	// Generate and bind element buffer object
 	glGenBuffers( 1,&eboW );
@@ -210,28 +212,30 @@ void init()
 	// --------------------------------------------------------------------
 
 	// --------------------------------------------------------------------
-	// -------  V E R T E X    A R R A Y    O B J E C T    B A L L  -------
+	// -------  V E R T E X   A R R A Y   O B J E C T   B A L L  -------
 	// --------------------------------------------------------------------
 	// Define new offsets
 	posDataOffset += sizeof(GLfloat) * 3 * NumVerticies;
 	colorDataOffset += sizeof(GLfloat) * 4 * NumVerticies;
 
 	// Use programB
-    glUseProgram( programB );
+	glUseProgram( programB );
 
-    // Generate new vertex array object
-    glGenVertexArrays( 1,&vaoB );
-    glBindVertexArray( vaoB );
+	// Generate new vertex array object
+	glGenVertexArrays( 1,&vaoB );
+	glBindVertexArray( vaoB );
 
 	// Bind vertex buffer object
 	// --Use same vbo as vaoP (no new buffer has been bound)
 	
-    // Bind attributes to vertex array
+	// Bind attributes to vertex array
+	in_position = glGetAttribLocation( programB, "in_position" );
 	glVertexAttribPointer(in_position,3,GL_FLOAT,GL_FALSE,0,BUFFER_OFFSET(posDataOffset));
-    glEnableVertexAttribArray( in_position );
+	glEnableVertexAttribArray( in_position );
 
+	in_color = glGetAttribLocation( programB, "in_color" );
 	glVertexAttribPointer(in_color,4,GL_FLOAT,GL_FALSE,0,BUFFER_OFFSET(colorDataOffset));
-    glEnableVertexAttribArray( in_color );
+	glEnableVertexAttribArray( in_color );
 
 	// Generate and bind element buffer object
 	glGenBuffers( 1,&eboB );
@@ -243,10 +247,10 @@ void init()
 	glUseProgram( 0 );
 	// --------------------------------------------------------------
 
-    // Retrieve transformation uniform variable locations
-    mMatrix = glGetUniformLocation( programP, "modelMatrix" );
-    vMatrix = glGetUniformLocation( programP, "viewMatrix" );
-    pMatrix = glGetUniformLocation( programP, "projectionMatrix" );
+	// Retrieve transformation uniform variable locations
+	mMatrix = glGetUniformLocation( programP, "modelMatrix" );
+	vMatrix = glGetUniformLocation( programP, "viewMatrix" );
+	pMatrix = glGetUniformLocation( programP, "projectionMatrix" );
 
 	// Initialize model matrices to their correct positions
 	modelP = identity() * Translate(PaddlePosInitial);
@@ -257,11 +261,11 @@ void init()
 	ballVel.x = VelInitial.x;
 	ballVel.y = VelInitial.y;
 	ballVel.z = VelInitial.z;
-    
-    glEnable( GL_DEPTH_TEST );
-	glDisable(GL_CULL_FACE);
+	
+	glEnable( GL_DEPTH_TEST );
+	glDisable( GL_CULL_FACE );
 
-    glClearColor( 0.0, 0.0, 0.0, 1.0 ); // black background
+	glClearColor( 0.0, 0.0, 0.0, 1.0 ); // black background
 }
 
 //----------------------------------------------------------------------------
@@ -296,39 +300,39 @@ void resetGame(){
 //----------------------------------------------------------------------------
 
 void display( SDL_Window* screen ){
-    glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+	glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
 	// Define view
-    mat4 view = LookAt( eye, at, up );
+	mat4 view = LookAt( eye, at, up );
 
 	// Draw elements of vaoB
 	glUseProgram( programB );
 	glBindVertexArray( vaoB );
-    glUniformMatrix4fv( mMatrix, 1, GL_TRUE, modelB );
-    glUniformMatrix4fv( vMatrix, 1, GL_TRUE, view );
-    glDrawElements( GL_TRIANGLE_FAN,sizeof(elemsArray),GL_UNSIGNED_BYTE,0 );
+	glUniformMatrix4fv( mMatrix, 1, GL_TRUE, modelB );
+	glUniformMatrix4fv( vMatrix, 1, GL_TRUE, view );
+	glDrawElements( GL_TRIANGLE_FAN,sizeof(elemsArray),GL_UNSIGNED_BYTE,0 );
 	glBindVertexArray( 0 );
 	glUseProgram( 0 );
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDepthMask(0);
-	
-	// Draw elements of vaoP
-	glUseProgram( programP );
-	glBindVertexArray( vaoP );
-    glUniformMatrix4fv( mMatrix, 1, GL_TRUE, modelP );
-    glUniformMatrix4fv( vMatrix, 1, GL_TRUE, view );
-    glDrawElements( GL_TRIANGLE_FAN,sizeof(elemsArray),GL_UNSIGNED_BYTE,0 );
-	glBindVertexArray( 0 );
-	glUseProgram( 0 );
 
 	// Draw elements of vaoW
 	glUseProgram( programW );
 	glBindVertexArray( vaoW );
-    glUniformMatrix4fv( mMatrix, 1, GL_TRUE, modelW );
-    glUniformMatrix4fv( vMatrix, 1, GL_TRUE, view );
-    glDrawElements( GL_TRIANGLE_FAN,sizeof(elemsArray),GL_UNSIGNED_BYTE,0 );
+	glUniformMatrix4fv( mMatrix, 1, GL_TRUE, modelW );
+	glUniformMatrix4fv( vMatrix, 1, GL_TRUE, view );
+	glDrawElements( GL_TRIANGLE_FAN,sizeof(elemsArray),GL_UNSIGNED_BYTE,0 );
+	glBindVertexArray( 0 );
+	glUseProgram( 0 );
+	
+	// Draw elements of vaoP
+	glUseProgram( programP );
+	glBindVertexArray( vaoP );
+	glUniformMatrix4fv( mMatrix, 1, GL_TRUE, modelP );
+	glUniformMatrix4fv( vMatrix, 1, GL_TRUE, view );
+	glDrawElements( GL_TRIANGLE_FAN,sizeof(elemsArray),GL_UNSIGNED_BYTE,0 );
 	glBindVertexArray( 0 );
 	glUseProgram( 0 );
 
@@ -338,7 +342,7 @@ void display( SDL_Window* screen ){
 	// Release binds and swap buffers
 	glBindVertexArray( 0 );
 	glUseProgram( 0 );
-    glFlush();
+	glFlush();
 	SDL_GL_SwapWindow(screen);
 }
 
@@ -410,7 +414,7 @@ void updateCollision(){
 	vec3 ballPos(modelB[0][3], modelB[1][3], modelB[2][3]);
 
 	// If collision with paddle
-	if (ballLx <= paddleRx && ballRx >= paddleLx && 
+	if (ballLx <= paddleRx && ballRx >= paddleLx &&
 		ballBy <= paddleTy && ballTy >= paddleBy &&
 		ballFz <= paddleFz && ballNz >= paddleNz &&
 		!collision.isComingFromPaddle){
@@ -441,7 +445,7 @@ void updateCollision(){
 	//   simultaneously.                                   //
 	/////////////////////////////////////////////////////////
 
-	// Check for left/right wall collision 
+	// Check for left/right wall collision
 	if ((ballLx <= LeftWallX && ballVel.x < 0) ||
 		(ballRx >= RightWallX && ballVel.x > 0)){
 
@@ -449,7 +453,7 @@ void updateCollision(){
 		ballVel.x = -ballVel.x;
 	}
 	
-	// Check for floor/ceiling collision 
+	// Check for floor/ceiling collision
 	if ((ballBy <= LeftWallX && ballVel.y < 0) ||
 		(ballTy >= RightWallX && ballVel.y > 0)){
 
@@ -522,21 +526,21 @@ void updateBallPosition(bool forceReset){
 //----------------------------------------------------------------------------
 
 void reshape( int width, int height ){
-    glViewport( 0, 0, width, height );
+	glViewport( 0, 0, width, height );
 
-    GLfloat zNearPersp = abs(modelP[2][3])-1.0, zFarPersp = modelW[2][3]-1.0;
+	GLfloat zNearPersp = abs(modelP[2][3])-1.0, zFarPersp = modelW[2][3]-1.0;
 	GLfloat FovY = 150.0;
 
-    GLfloat aspect = GLfloat(width)/height;
+	GLfloat aspect = GLfloat(width)/height;
 
-    mat4 projection = Perspective( FovY, aspect, zNearPersp, zFarPersp );
+	mat4 projection = Perspective( FovY, aspect, zNearPersp, zFarPersp );
 
 	// Bind new projection to each program
 	glUseProgram( programP );
-    glUniformMatrix4fv( pMatrix, 1, GL_TRUE, projection );
+	glUniformMatrix4fv( pMatrix, 1, GL_TRUE, projection );
 
 	glUseProgram( programB );
-    glUniformMatrix4fv( pMatrix, 1, GL_TRUE, projection );
+	glUniformMatrix4fv( pMatrix, 1, GL_TRUE, projection );
 	glUseProgram( 0 );
 }
 
@@ -597,7 +601,7 @@ int main( int argc, char **argv )
 		// Update frame to frame positioning
 		updateCollision();
 		updateScore();
-		updateSpeed();		
+		updateSpeed();
 		updateBallPosition(false);
 		reshape(WindowWidth,WindowHeight);
 		display(window);
@@ -618,6 +622,6 @@ int main( int argc, char **argv )
 	SDL_DestroyWindow(window);
 	SDL_Quit();
 	
-    return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }
 
