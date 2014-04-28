@@ -524,22 +524,12 @@ void updateBallPosition(bool forceReset){
 void reshape( int width, int height ){
     glViewport( 0, 0, width, height );
 
-    GLfloat left = -10.0, right = 10.0;
-    GLfloat top = 10.0, bottom = -10.0;
-    GLfloat zNear = -10.0, zFar = 20.0;
+    GLfloat zNearPersp = abs(modelP[2][3])-1.0, zFarPersp = modelW[2][3]-1.0;
+	GLfloat FovY = 150.0;
 
     GLfloat aspect = GLfloat(width)/height;
 
-    if ( aspect > 1.0 ) {
-		left *= aspect;
-		right *= aspect;
-    } else {
-		top /= aspect;
-		bottom /= aspect;
-    }
-
-    mat4 projection = Ortho( left, right, bottom, top, zNear, zFar );
-	//mat4 projection = Frustum( left, right, bottom, top, zNear, zFar );
+    mat4 projection = Perspective( FovY, aspect, zNearPersp, zFarPersp );
 
 	// Bind new projection to each program
 	glUseProgram( programP );
