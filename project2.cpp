@@ -191,7 +191,7 @@ void init()
 
 	// Bind vertex buffer object
 	// --Use same vbo as vaoP (no new buffer has been bound)
-	
+
 	// Bind attributes to vertex array
 	in_position = glGetAttribLocation( programW, "in_position" );
 	glVertexAttribPointer(in_position,3,GL_FLOAT,GL_FALSE,0,BUFFER_OFFSET(posDataOffset));
@@ -227,7 +227,7 @@ void init()
 
 	// Bind vertex buffer object
 	// --Use same vbo as vaoP (no new buffer has been bound)
-	
+
 	// Bind attributes to vertex array
 	in_position = glGetAttribLocation( programB, "in_position" );
 	glVertexAttribPointer(in_position,3,GL_FLOAT,GL_FALSE,0,BUFFER_OFFSET(posDataOffset));
@@ -261,7 +261,7 @@ void init()
 	ballVel.x = VelInitial.x;
 	ballVel.y = VelInitial.y;
 	ballVel.z = VelInitial.z;
-	
+
 	glEnable( GL_DEPTH_TEST );
 	glDisable( GL_CULL_FACE );
 
@@ -326,7 +326,7 @@ void display( SDL_Window* screen ){
 	glDrawElements( GL_TRIANGLE_FAN,sizeof(elemsArray),GL_UNSIGNED_BYTE,0 );
 	glBindVertexArray( 0 );
 	glUseProgram( 0 );
-	
+
 	// Draw elements of vaoP
 	glUseProgram( programP );
 	glBindVertexArray( vaoP );
@@ -362,22 +362,22 @@ void input(SDL_Window* screen){
 			case SDLK_ESCAPE:
 			case SDLK_q:
 				exit(EXIT_SUCCESS);
-			case SDLK_w:	//paddle up
+			case SDLK_w: case SDLK_UP:	// move paddle up
 				if (modelP[1][3] < CeilingY - FloatImprecisionFactor) {
 					modelP = modelP * Translate(0.0,1.0,0.0);
 				}
 				break;
-			case SDLK_s:	//paddle down;
+			case SDLK_s: case SDLK_DOWN:	// move paddle down;
 				if (modelP[1][3] > FloorY + FloatImprecisionFactor) {
 					modelP = modelP * Translate(0.0,-1.0,0.0);
 				}
 				break;
-			case SDLK_d:	//paddle right;
+			case SDLK_d: case SDLK_RIGHT:	// move paddle right;
 				if (modelP[0][3] < RightWallX - FloatImprecisionFactor) {
 					modelP = modelP * Translate(1.0,0.0,0.0);
 				}
 				break;
-			case SDLK_a:	//paddle left;
+			case SDLK_a: case SDLK_LEFT:	// move paddle left;
 				if (modelP[0][3] > LeftWallX + FloatImprecisionFactor) {
 					modelP = modelP * Translate(-1.0,0.0,0.0);
 				}
@@ -386,6 +386,45 @@ void input(SDL_Window* screen){
 				resetGame();
 				break;
 			}
+		case SDL_MOUSEMOTION:
+			float MouseMotionFactor = 26.0;
+
+			static int prevMouseX = event.motion.x;
+			static int prevMouseY = event.motion.y;
+
+			int mouseX = event.motion.x, mouseY = event.motion.y;
+
+			float proposedMoveX = (mouseX - prevMouseX)/MouseMotionFactor;
+			float proposedMoveY = -(mouseY - prevMouseY)/MouseMotionFactor;
+
+			vec3 translationVec3(0.0,0.0,0.0);
+
+			// Control Paddle movement on X axis
+			if(modelP[0][3] + proposedMoveX < RightWallX &&
+				modelP[0][3] + proposedMoveX > LeftWallX){
+				translationVec3.x = translationVec3.x + proposedMoveX;
+			}
+
+			// Control Paddle movement on Y axis
+			if(modelP[1][3] + proposedMoveY < CeilingY &&
+				modelP[1][3] + proposedMoveY > FloorY){
+				translationVec3.y = translationVec3.y + proposedMoveY;
+			}
+
+			//std::cout<<"Current X="<<modelP[0][3]+PaddleWidth/2+proposedMoveX<<std::endl;
+			//std::cout<<"Proposed final X (right)="<<modelP[0][3]+PaddleWidth/2+proposedMoveX<<std::endl;
+			//std::cout<<"Proposed final X (center)="<<modelP[0][3]+proposedMoveX<<std::endl;
+			//std::cout<<"Proposed move X="<<proposedMoveX<<std::endl;
+			//printMat4(modelP);
+
+			// Set up previous mouse coordinates for next MouseMotion event
+			prevMouseX = mouseX;
+			prevMouseY = mouseY;
+
+			// Move the paddle accordingly
+			modelP = modelP * Translate(translationVec3);
+
+			break;
 		}
 	}
 }
@@ -452,7 +491,7 @@ void updateCollision(){
 		//std::cout<<"Collision with left/right wall"<<std::endl;
 		ballVel.x = -ballVel.x;
 	}
-	
+
 	// Check for floor/ceiling collision
 	if ((ballBy <= LeftWallX && ballVel.y < 0) ||
 		(ballTy >= RightWallX && ballVel.y > 0)){
@@ -470,7 +509,7 @@ void updateScore(){
 
 	float ballPositionZ = modelB[2][3];
 	float missWall = modelP[2][3] + GoalDepthZ;
-	
+
 	// Player hit the ball
 	if (collision.isColliding && collision.isComingFromPaddle){
 		score++;
@@ -550,11 +589,11 @@ int main( int argc, char **argv )
 {
 	//SDL window and context management
 	SDL_Window *window;
-	
+
 	//used in main loop
 	int sleepTime = 0;
 	int ticksBegin, ticksEnd;
-	
+
 	if(SDL_Init(SDL_INIT_VIDEO)<0){//initilizes the SDL video subsystem
 		fprintf(stderr,"Unable to create window: %s\n", SDL_GetError());
 		SDL_Quit();
@@ -570,7 +609,7 @@ int main( int argc, char **argv )
 		WindowHeight,				//height, in pixels
 		SDL_WINDOW_OPENGL			//flags to be had
 		);
-	
+
 	//check window creation
 	if(window==NULL){
 		fprintf(stderr,"Unable to create window: %s\n",SDL_GetError());
@@ -578,7 +617,7 @@ int main( int argc, char **argv )
 
 	//creates opengl context associated with the window
 	SDL_GLContext glcontext=SDL_GL_CreateContext(window);
-	
+
 	//initializes glew
 	glewExperimental=GL_TRUE;
 	if(glewInit()){
@@ -621,7 +660,7 @@ int main( int argc, char **argv )
 	SDL_GL_DeleteContext(glcontext);
 	SDL_DestroyWindow(window);
 	SDL_Quit();
-	
+
 	return EXIT_SUCCESS;
 }
 
