@@ -8,6 +8,7 @@
 #include <chrono>
 #include <thread>
 #include <cmath>
+#include <math.h>
 
 typedef Angel::vec4 point4;
 typedef Angel::vec4 color4;
@@ -45,6 +46,14 @@ struct collisionInfo{
 
 } collision;
 
+//for angel sphere
+const int NumTimesToSubdivide = 5;
+const int NumTriangles        = 4096;  // (4 faces)^(NumTimesToSubdivide + 1)
+const int NumVertices         = 3 * NumTriangles;
+point4 points[NumVertices];
+vec3   normals[NumVertices];
+int Index = 0;
+
 // Model and view matrices uniform location
 GLuint  mMatrix, vMatrix, pMatrix;
 GLuint vaoP, vaoW, vaoB, eboP, eboW, eboB;
@@ -67,13 +76,7 @@ GLfloat positionArray[]={
 	-10.0,-7.0,0.0,
 	-10.0,7.0,0.0,
 	10.0,7.0,0.0,
-	10.0,-7.0,0.0,
-
-	// Ball
-	-0.5,-0.5,0.0,
-	-0.5,0.5,0.0,
-	0.5,0.5,0.0,
-	0.5,-0.5,0.0
+	10.0,-7.0,0.0
 };
 
 GLfloat colorArray[]={
@@ -87,13 +90,7 @@ GLfloat colorArray[]={
 	0.0,0.0,1.0,1.0,
 	0.0,0.0,1.0,1.0,
 	0.0,0.0,1.0,1.0,
-	0.0,0.0,1.0,1.0,
-
-	// Ball
-	1.0f,1.0f,0.0f,1.0f,
-	0.0f,0.0f,0.0f,1.0f,
-	0.0f,1.0f,1.0f,1.0f,
-	1.0f,0.0f,1.0f,1.0f
+	0.0,0.0,1.0,1.0
 };
 
 GLubyte elemsArray[]={
@@ -105,6 +102,9 @@ GLuint NumVerticies = 4;
 GLfloat BallRadius = 0.5;
 GLfloat PaddleHeight = 4.0;
 GLfloat PaddleWidth = 4.0;
+
+size_t posDataOffset, colorDataOffset, normalsDataOffset, spherePosDataOffset;
+
 
 // Functional Prototypes
 void init( );
@@ -122,24 +122,77 @@ void reshape( int, int );
 // -------------- F U N C T I O N S --------------
 // -----------------------------------------------
 
+//for angel sphere
+void triangle( const point4& a, const point4& b, const point4& c ){
+    vec3  normal = normalize( cross(b - a, c - b) );
+
+    normals[Index] = normal;  points[Index] = a;  Index++;
+    normals[Index] = normal;  points[Index] = b;  Index++;
+    normals[Index] = normal;  points[Index] = c;  Index++;
+}
+
+point4 unit( const point4& p ){
+    float len = p.x*p.x + p.y*p.y + p.z*p.z;
+    
+    point4 t;
+    if ( len > DivideByZeroTolerance ) {
+	t = p / sqrt(len);
+	t.w = 1.0;
+    }
+
+    return t;
+}
+
+void divide_triangle( const point4& a, const point4& b, const point4& c, int count ){
+    if ( count > 0 ) {
+        point4 v1 = unit( a + b );
+        point4 v2 = unit( a + c );
+        point4 v3 = unit( b + c );
+        divide_triangle(  a, v1, v2, count - 1 );
+        divide_triangle(  c, v2, v3, count - 1 );
+        divide_triangle(  b, v3, v1, count - 1 );
+        divide_triangle( v1, v3, v2, count - 1 );
+    }
+    else {
+        triangle( a, b, c );
+    }
+}
+
+void tetrahedron( int count ){
+	point4 v[4] = {
+		vec4( 0.0, 0.0, 1.0, 1.0 ),
+		vec4( 0.0, 0.942809, -0.333333, 1.0 ),
+		vec4( -0.816497, -0.471405, -0.333333, 1.0 ),
+		vec4( 0.816497, -0.471405, -0.333333, 1.0 )
+	};
+
+    divide_triangle( v[0], v[1], v[2], count );
+    divide_triangle( v[3], v[2], v[1], count );
+    divide_triangle( v[0], v[3], v[1], count );
+    divide_triangle( v[0], v[2], v[3], count );
+}
+
 // OpenGL initialization
-void init()
-{
+void init(){
 	// Load shaders and use the resulting shader program
-	programP = InitShader( "vshaderP.glsl", "fshader.glsl" );
-	programW = InitShader( "vshaderW.glsl", "fshader.glsl" );
-	programB = InitShader( "vshaderB.glsl", "fshader.glsl" );
+	programP = InitShader( "vshaderP.glsl", "fshader_nolights.glsl" );
+	programW = InitShader( "vshaderW.glsl", "fshader_nolights.glsl" );
+	programB = InitShader( "vshaderB.glsl", "fshader_lights.glsl" );
 
 	// Define data members
 	GLuint vbo;
-	size_t posDataOffset, colorDataOffset;
+	// Subdivide a tetrahedron into a sphere
+	tetrahedron( NumTimesToSubdivide );
+
 
 	// ------------------------------------------------------------------------
 	// -------  V E R T E X   A R R A Y   O B J E C T   P A D D L E  -------
 	// ------------------------------------------------------------------------
 	// Define offsets and sizes
 	posDataOffset = 0;
-	colorDataOffset = sizeof(positionArray);
+	colorDataOffset = posDataOffset + sizeof(positionArray);
+	spherePosDataOffset = colorDataOffset + sizeof(colorArray);
+	normalsDataOffset = spherePosDataOffset + sizeof(points);
 
 	// Use programP
 	glUseProgram( programP );
@@ -151,9 +204,12 @@ void init()
 	// Generate and bind new vertex buffer object and populate the buffer
 	glGenBuffers( 1,&vbo );
 	glBindBuffer( GL_ARRAY_BUFFER,vbo );
-	glBufferData( GL_ARRAY_BUFFER,sizeof(positionArray) + sizeof(colorArray),NULL,GL_STATIC_DRAW );
+	glBufferData( GL_ARRAY_BUFFER, sizeof(positionArray) + sizeof(colorArray) + sizeof(points) + 
+		sizeof(normals),NULL,GL_STATIC_DRAW );
 	glBufferSubData( GL_ARRAY_BUFFER,posDataOffset,sizeof(positionArray),positionArray );
 	glBufferSubData( GL_ARRAY_BUFFER,colorDataOffset,sizeof(colorArray),colorArray );
+	glBufferSubData( GL_ARRAY_BUFFER,spherePosDataOffset,sizeof(points), points );
+	glBufferSubData( GL_ARRAY_BUFFER,normalsDataOffset,sizeof(normals), normals );
 
 	// Bind position attribute of vbo
 	GLuint in_position = glGetAttribLocation( programP, "in_position" );
@@ -164,6 +220,7 @@ void init()
 	GLuint in_color = glGetAttribLocation( programP, "in_color" );
 	glVertexAttribPointer( in_color,4,GL_FLOAT,GL_FALSE,0,BUFFER_OFFSET(colorDataOffset) );
 	glEnableVertexAttribArray( in_color );
+	
 
 	// Generate and bind element buffer object
 	glGenBuffers( 1,&eboP );
@@ -181,6 +238,8 @@ void init()
 	// Define new offsets
 	posDataOffset += sizeof(GLfloat) * 3 * NumVerticies;
 	colorDataOffset += sizeof(GLfloat) * 4 * NumVerticies;
+	//sphere position data offset (points) stays constant
+	//normals data offset (normals) stays constant
 
 	// Use programW
 	glUseProgram( programW );
@@ -217,6 +276,8 @@ void init()
 	// Define new offsets
 	posDataOffset += sizeof(GLfloat) * 3 * NumVerticies;
 	colorDataOffset += sizeof(GLfloat) * 4 * NumVerticies;
+	//sphere position data offset (points) stays constant
+	//normals data offset (normals) stays constant
 
 	// Use programB
 	glUseProgram( programB );
@@ -225,27 +286,55 @@ void init()
 	glGenVertexArrays( 1,&vaoB );
 	glBindVertexArray( vaoB );
 
-	// Bind vertex buffer object
-	// --Use same vbo as vaoP (no new buffer has been bound)
+	glUseProgram( programB );
 
-	// Bind attributes to vertex array
+	// set up vertex arrays
 	in_position = glGetAttribLocation( programB, "in_position" );
-	glVertexAttribPointer(in_position,3,GL_FLOAT,GL_FALSE,0,BUFFER_OFFSET(posDataOffset));
 	glEnableVertexAttribArray( in_position );
+	glVertexAttribPointer( in_position, 4, GL_FLOAT, GL_FALSE, 0,
+		BUFFER_OFFSET(spherePosDataOffset) );
 
-	in_color = glGetAttribLocation( programB, "in_color" );
-	glVertexAttribPointer(in_color,4,GL_FLOAT,GL_FALSE,0,BUFFER_OFFSET(colorDataOffset));
-	glEnableVertexAttribArray( in_color );
+	GLuint in_normals = glGetAttribLocation( programB, "in_normals" ); 
+	glEnableVertexAttribArray( in_normals );
+	glVertexAttribPointer( in_normals, 3, GL_FLOAT, GL_FALSE, 0,
+		BUFFER_OFFSET(normalsDataOffset));
 
-	// Generate and bind element buffer object
-	glGenBuffers( 1,&eboB );
-	glBindBuffer( GL_ELEMENT_ARRAY_BUFFER,eboB );
-	glBufferData( GL_ELEMENT_ARRAY_BUFFER,sizeof(elemsArray),elemsArray,GL_STATIC_DRAW );
+
+	// Light stuff for ball------------------------------------------
+	// Initialize shader lighting parameters
+	point4 light_positionB( 10.0, 10.0, 10.0, 0.0 );
+	color4 light_ambientB( 0.2, 0.2, 0.2, 1.0 );
+	color4 light_diffuseB( 1.0, 1.0, 1.0, 1.0 );
+	color4 light_specularB( 1.0, 1.0, 1.0, 1.0 );
+
+	color4 material_ambientB( 1.0, 0.0, 1.0, 1.0 );
+	color4 material_diffuseB( 1.0, 0.8, 0.0, 1.0 );
+	color4 material_specularB( 1.0, 0.0, 1.0, 1.0 );
+	float  material_shininessB = 5.0;
+	
+	color4 ambient_productB = light_ambientB * material_ambientB;
+	color4 diffuse_productB = light_diffuseB * material_diffuseB;
+	color4 specular_productB = light_specularB * material_specularB;
+
+	glUniform4fv( glGetUniformLocation(programB, "AmbientProduct"),
+		  1, ambient_productB );
+	glUniform4fv( glGetUniformLocation(programB, "DiffuseProduct"),
+		  1, diffuse_productB );
+	glUniform4fv( glGetUniformLocation(programB, "SpecularProduct"),
+		  1, specular_productB );
+	
+	glUniform4fv( glGetUniformLocation(programB, "LightPosition"),
+		  1, light_positionB );
+	
+	glUniform1f( glGetUniformLocation(programB, "Shininess"),
+		 material_shininessB );
+
 
 	// Release bind to vaoB and programB
 	glBindVertexArray( 0 );
 	glUseProgram( 0 );
 	// --------------------------------------------------------------
+		 
 
 	// Retrieve transformation uniform variable locations
 	mMatrix = glGetUniformLocation( programP, "modelMatrix" );
@@ -265,7 +354,7 @@ void init()
 	glEnable( GL_DEPTH_TEST );
 	glDisable( GL_CULL_FACE );
 
-	glClearColor( 0.0, 0.0, 0.0, 1.0 ); // black background
+	glClearColor( 1.0, 1.0, 1.0, 1.0 ); // black background
 }
 
 //----------------------------------------------------------------------------
@@ -310,7 +399,7 @@ void display( SDL_Window* screen ){
 	glBindVertexArray( vaoB );
 	glUniformMatrix4fv( mMatrix, 1, GL_TRUE, modelB );
 	glUniformMatrix4fv( vMatrix, 1, GL_TRUE, view );
-	glDrawElements( GL_TRIANGLE_FAN,sizeof(elemsArray),GL_UNSIGNED_BYTE,0 );
+	glDrawArrays(GL_TRIANGLES, 0, NumVertices);
 	glBindVertexArray( 0 );
 	glUseProgram( 0 );
 
@@ -654,7 +743,7 @@ int main( int argc, char **argv )
 		}
 		std::chrono::milliseconds dura(sleepTime);
 		std::this_thread::sleep_for(dura);
-	}
+	}	
 
 	// Close Application Normally
 	SDL_GL_DeleteContext(glcontext);

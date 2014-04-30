@@ -3,13 +3,23 @@
 uniform mat4 modelMatrix;
 uniform mat4 viewMatrix;
 uniform mat4 projectionMatrix;
+uniform vec4 LightPosition;
 
-in vec3 in_position;
-in vec4 in_color;
+in vec4 in_position;
+in vec3 in_normals;
 
-out vec4 pass_color;
+out vec3 fN;
+out vec3 fE;
+out vec3 fL;
 
 void main(){
-  gl_Position=projectionMatrix*viewMatrix*modelMatrix*vec4(in_position,1.0); 
-  pass_color=in_color;
+	fN = in_normals;
+	fE = ((viewMatrix*modelMatrix)*in_position).xyz;
+	fL = LightPosition.xyz;
+
+	if( LightPosition.w != 0.0 ) {
+		fL = LightPosition.xyz - in_position.xyz;
+	}
+
+	gl_Position=projectionMatrix*viewMatrix*modelMatrix*in_position; 
 }
