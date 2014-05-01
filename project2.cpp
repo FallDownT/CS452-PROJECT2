@@ -56,8 +56,11 @@ int Index = 0;
 
 // Model and view matrices uniform location
 GLuint  mMatrix, vMatrix, pMatrix;
-GLuint vaoP, vaoW, vaoB, eboP, eboW, eboB;
+GLuint vaoP, vaoW, vaoB, eboP, eboW, eboB, vbo_cube_texcoords;
 GLuint programP, programW, programB;
+GLuint texture_id;
+GLint attribute_texcoord;
+GLint uniform_mytexture;
 mat4 modelP, modelW, modelB;
 
 // Create camera view variables
@@ -97,6 +100,14 @@ GLubyte elemsArray[]={
 	0,1,2,3
 };
 
+GLfloat cube_texcoords[2*4*6] = {
+    // front
+	0.0, 0.0,
+	1.0, 0.0,
+	1.0, 1.0,
+	0.0, 1.0,
+};
+
 // Define geometric Constants
 GLuint NumVerticies = 4;
 GLfloat BallRadius = 0.5;
@@ -124,38 +135,38 @@ void reshape( int, int );
 
 //for angel sphere
 void triangle( const point4& a, const point4& b, const point4& c ){
-    vec3  normal = normalize( cross(b - a, c - b) );
+	vec3  normal = normalize( cross(b - a, c - b) );
 
-    normals[Index] = normal;  points[Index] = a;  Index++;
-    normals[Index] = normal;  points[Index] = b;  Index++;
-    normals[Index] = normal;  points[Index] = c;  Index++;
+	normals[Index] = normal;  points[Index] = a;  Index++;
+	normals[Index] = normal;  points[Index] = b;  Index++;
+	normals[Index] = normal;  points[Index] = c;  Index++;
 }
 
 point4 unit( const point4& p ){
-    float len = p.x*p.x + p.y*p.y + p.z*p.z;
-    
-    point4 t;
-    if ( len > DivideByZeroTolerance ) {
-	t = p / sqrt(len);
-	t.w = 1.0;
-    }
+	float len = p.x*p.x + p.y*p.y + p.z*p.z;
 
-    return t;
+	point4 t;
+	if ( len > DivideByZeroTolerance ) {
+		t = p / sqrt(len);
+		t.w = 1.0;
+	}
+
+	return t;
 }
 
 void divide_triangle( const point4& a, const point4& b, const point4& c, int count ){
-    if ( count > 0 ) {
-        point4 v1 = unit( a + b );
-        point4 v2 = unit( a + c );
-        point4 v3 = unit( b + c );
-        divide_triangle(  a, v1, v2, count - 1 );
-        divide_triangle(  c, v2, v3, count - 1 );
-        divide_triangle(  b, v3, v1, count - 1 );
-        divide_triangle( v1, v3, v2, count - 1 );
-    }
-    else {
-        triangle( a, b, c );
-    }
+	if ( count > 0 ) {
+		point4 v1 = unit( a + b );
+		point4 v2 = unit( a + c );
+		point4 v3 = unit( b + c );
+		divide_triangle(  a, v1, v2, count - 1 );
+		divide_triangle(  c, v2, v3, count - 1 );
+		divide_triangle(  b, v3, v1, count - 1 );
+		divide_triangle( v1, v3, v2, count - 1 );
+	}
+	else {
+		triangle( a, b, c );
+	}
 }
 
 void tetrahedron( int count ){
@@ -166,16 +177,16 @@ void tetrahedron( int count ){
 		vec4( 0.816497, -0.471405, -0.333333, 1.0 )
 	};
 
-    divide_triangle( v[0], v[1], v[2], count );
-    divide_triangle( v[3], v[2], v[1], count );
-    divide_triangle( v[0], v[3], v[1], count );
-    divide_triangle( v[0], v[2], v[3], count );
+	divide_triangle( v[0], v[1], v[2], count );
+	divide_triangle( v[3], v[2], v[1], count );
+	divide_triangle( v[0], v[3], v[1], count );
+	divide_triangle( v[0], v[2], v[3], count );
 }
 
 // OpenGL initialization
 void init(){
 	// Load shaders and use the resulting shader program
-	programP = InitShader( "vshaderP.glsl", "fshader_nolights.glsl" );
+	programP = InitShader( "vshaderP.glsl", "fshader_nolights_tex.glsl" );
 	programW = InitShader( "vshaderW.glsl", "fshader_nolights.glsl" );
 	programB = InitShader( "vshaderB.glsl", "fshader_lights.glsl" );
 
@@ -184,22 +195,44 @@ void init(){
 	// Subdivide a tetrahedron into a sphere
 	tetrahedron( NumTimesToSubdivide );
 
+	//texture mapping stuff
+	GLubyte textureData[]={
+		0xFF,0x33,0x7b,
+		0xFF,0xfa,0x55,
+		0x00,0x11,0x00,
+		0x6f,0x40,0xc1
+		};
 
-	// ------------------------------------------------------------------------
-	// -------  V E R T E X   A R R A Y   O B J E C T   P A D D L E  -------
-	// ------------------------------------------------------------------------
+	glGenTextures(1, &texture_id);
+  glBindTexture(GL_TEXTURE_2D, texture_id);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  glTexImage2D(GL_TEXTURE_2D, // target
+	       0,  // level, 0 = base, no minimap,
+	       GL_RGB, // internalformat
+	       10,  // width
+	       10,  // height
+	       0,  // border, always 0 in OpenGL ES
+	       GL_RGB,  // format
+	       GL_UNSIGNED_BYTE, // type
+	       textureData);
+
+	// --------------------------------------------------------------------
+	// -------  V E R T E X   A R R A Y   O B J E C T   B A L L  -------
+	// --------------------------------------------------------------------
 	// Define offsets and sizes
 	posDataOffset = 0;
 	colorDataOffset = posDataOffset + sizeof(positionArray);
 	spherePosDataOffset = colorDataOffset + sizeof(colorArray);
 	normalsDataOffset = spherePosDataOffset + sizeof(points);
 
-	// Use programP
-	glUseProgram( programP );
+	// Use programB
+	glUseProgram( programB );
 
-	// Generate and bind new vertex array object
-	glGenVertexArrays( 1,&vaoP );
-	glBindVertexArray( vaoP );
+	// Generate new vertex array object
+	glGenVertexArrays( 1,&vaoB );
+	glBindVertexArray( vaoB );
 
 	// Generate and bind new vertex buffer object and populate the buffer
 	glGenBuffers( 1,&vbo );
@@ -211,8 +244,70 @@ void init(){
 	glBufferSubData( GL_ARRAY_BUFFER,spherePosDataOffset,sizeof(points), points );
 	glBufferSubData( GL_ARRAY_BUFFER,normalsDataOffset,sizeof(normals), normals );
 
+	// set up vertex arrays
+	GLuint in_position = glGetAttribLocation( programB, "in_position" );
+	glEnableVertexAttribArray( in_position );
+	glVertexAttribPointer( in_position, 4, GL_FLOAT, GL_FALSE, 0,
+		BUFFER_OFFSET(spherePosDataOffset) );
+
+	GLuint in_normals = glGetAttribLocation( programB, "in_normals" ); 
+	glEnableVertexAttribArray( in_normals );
+	glVertexAttribPointer( in_normals, 3, GL_FLOAT, GL_FALSE, 0,
+		BUFFER_OFFSET(normalsDataOffset));
+
+
+	// Light stuff for ball------------------------------------------
+	// Initialize shader lighting parameters
+	point4 light_positionB( 10.0, 10.0, 10.0, 0.0 );
+	color4 light_ambientB( 0.2, 0.2, 0.2, 1.0 );
+	color4 light_diffuseB( 1.0, 1.0, 1.0, 1.0 );
+	color4 light_specularB( 1.0, 1.0, 1.0, 1.0 );
+
+	color4 material_ambientB( 0.0, 0.0, 1.0, 1.0 );
+	color4 material_diffuseB( 0.0, 0.0, 1.0, 1.0 );
+	color4 material_specularB( 1.0, 1.0, 1.0, 1.0 );
+	float  material_shininessB = 5.0;
+	
+	color4 ambient_productB = light_ambientB * material_ambientB;
+	color4 diffuse_productB = light_diffuseB * material_diffuseB;
+	color4 specular_productB = light_specularB * material_specularB;
+
+	glUniform4fv( glGetUniformLocation(programB, "AmbientProduct"),
+		1, ambient_productB );
+	glUniform4fv( glGetUniformLocation(programB, "DiffuseProduct"),
+		1, diffuse_productB );
+	glUniform4fv( glGetUniformLocation(programB, "SpecularProduct"),
+		1, specular_productB );
+	
+	glUniform4fv( glGetUniformLocation(programB, "LightPosition"),
+		1, light_positionB );
+	
+	glUniform1f( glGetUniformLocation(programB, "Shininess"),
+		material_shininessB );
+
+	// Release bind to vaoB and programB
+	glBindVertexArray( 0 );
+	glUseProgram( 0 );
+	// ------------------------------------------------------------------------
+
+	// ------------------------------------------------------------------------
+	// -------  V E R T E X   A R R A Y   O B J E C T   P A D D L E  -------
+	// ------------------------------------------------------------------------
+	// Define new offsets
+	//posDataOffset += sizeof(GLfloat) * 3 * NumVerticies;
+	//colorDataOffset += sizeof(GLfloat) * 4 * NumVerticies;
+	//sphere position data offset (points) stays constant
+	//normals data offset (normals) stays constant
+
+	// Use programP
+	glUseProgram( programP );
+
+	// Generate and bind new vertex array object
+	glGenVertexArrays( 1,&vaoP );
+	glBindVertexArray( vaoP );
+
 	// Bind position attribute of vbo
-	GLuint in_position = glGetAttribLocation( programP, "in_position" );
+	in_position = glGetAttribLocation( programP, "in_position" );
 	glVertexAttribPointer( in_position,3,GL_FLOAT,GL_FALSE,0,BUFFER_OFFSET(posDataOffset) );
 	glEnableVertexAttribArray( in_position );
 
@@ -220,16 +315,26 @@ void init(){
 	GLuint in_color = glGetAttribLocation( programP, "in_color" );
 	glVertexAttribPointer( in_color,4,GL_FLOAT,GL_FALSE,0,BUFFER_OFFSET(colorDataOffset) );
 	glEnableVertexAttribArray( in_color );
-	
 
 	// Generate and bind element buffer object
 	glGenBuffers( 1,&eboP );
 	glBindBuffer( GL_ELEMENT_ARRAY_BUFFER,eboP );
 	glBufferData( GL_ELEMENT_ARRAY_BUFFER,sizeof(elemsArray),elemsArray,GL_STATIC_DRAW );
 
-	// Release bind to vaoP and programP
+	glGenBuffers(1, &vbo_cube_texcoords);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo_cube_texcoords);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(cube_texcoords), cube_texcoords, GL_STATIC_DRAW);
+
+	// Bind texture positions
+	attribute_texcoord = glGetAttribLocation(programP, "texcoord");
+	glEnableVertexAttribArray(attribute_texcoord);
+	glVertexAttribPointer(attribute_texcoord, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+	// Release bind to vaoP and programP and the paddle texture
+	glBindTexture( 0, 0 );
 	glBindVertexArray( 0 );
 	glUseProgram( 0 );
+
 	// --------------------------------------------------------------------
 
 	// --------------------------------------------------------------------
@@ -270,71 +375,6 @@ void init(){
 	glUseProgram( 0 );
 	// --------------------------------------------------------------------
 
-	// --------------------------------------------------------------------
-	// -------  V E R T E X   A R R A Y   O B J E C T   B A L L  -------
-	// --------------------------------------------------------------------
-	// Define new offsets
-	posDataOffset += sizeof(GLfloat) * 3 * NumVerticies;
-	colorDataOffset += sizeof(GLfloat) * 4 * NumVerticies;
-	//sphere position data offset (points) stays constant
-	//normals data offset (normals) stays constant
-
-	// Use programB
-	glUseProgram( programB );
-
-	// Generate new vertex array object
-	glGenVertexArrays( 1,&vaoB );
-	glBindVertexArray( vaoB );
-
-	glUseProgram( programB );
-
-	// set up vertex arrays
-	in_position = glGetAttribLocation( programB, "in_position" );
-	glEnableVertexAttribArray( in_position );
-	glVertexAttribPointer( in_position, 4, GL_FLOAT, GL_FALSE, 0,
-		BUFFER_OFFSET(spherePosDataOffset) );
-
-	GLuint in_normals = glGetAttribLocation( programB, "in_normals" ); 
-	glEnableVertexAttribArray( in_normals );
-	glVertexAttribPointer( in_normals, 3, GL_FLOAT, GL_FALSE, 0,
-		BUFFER_OFFSET(normalsDataOffset));
-
-
-	// Light stuff for ball------------------------------------------
-	// Initialize shader lighting parameters
-	point4 light_positionB( 10.0, 10.0, 10.0, 0.0 );
-	color4 light_ambientB( 0.2, 0.2, 0.2, 1.0 );
-	color4 light_diffuseB( 1.0, 1.0, 1.0, 1.0 );
-	color4 light_specularB( 1.0, 1.0, 1.0, 1.0 );
-
-	color4 material_ambientB( 1.0, 0.0, 1.0, 1.0 );
-	color4 material_diffuseB( 1.0, 0.8, 0.0, 1.0 );
-	color4 material_specularB( 1.0, 0.0, 1.0, 1.0 );
-	float  material_shininessB = 5.0;
-	
-	color4 ambient_productB = light_ambientB * material_ambientB;
-	color4 diffuse_productB = light_diffuseB * material_diffuseB;
-	color4 specular_productB = light_specularB * material_specularB;
-
-	glUniform4fv( glGetUniformLocation(programB, "AmbientProduct"),
-		  1, ambient_productB );
-	glUniform4fv( glGetUniformLocation(programB, "DiffuseProduct"),
-		  1, diffuse_productB );
-	glUniform4fv( glGetUniformLocation(programB, "SpecularProduct"),
-		  1, specular_productB );
-	
-	glUniform4fv( glGetUniformLocation(programB, "LightPosition"),
-		  1, light_positionB );
-	
-	glUniform1f( glGetUniformLocation(programB, "Shininess"),
-		 material_shininessB );
-
-
-	// Release bind to vaoB and programB
-	glBindVertexArray( 0 );
-	glUseProgram( 0 );
-	// --------------------------------------------------------------
-		 
 
 	// Retrieve transformation uniform variable locations
 	mMatrix = glGetUniformLocation( programP, "modelMatrix" );
@@ -421,6 +461,12 @@ void display( SDL_Window* screen ){
 	glBindVertexArray( vaoP );
 	glUniformMatrix4fv( mMatrix, 1, GL_TRUE, modelP );
 	glUniformMatrix4fv( vMatrix, 1, GL_TRUE, view );
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, texture_id);
+	uniform_mytexture = glGetUniformLocation(programP, "texture");
+	glUniform1i(uniform_mytexture, 0);
+
 	glDrawElements( GL_TRIANGLE_FAN,sizeof(elemsArray),GL_UNSIGNED_BYTE,0 );
 	glBindVertexArray( 0 );
 	glUseProgram( 0 );
@@ -444,61 +490,61 @@ void input(SDL_Window* screen){
 	//Handle the keyboard
 	while (SDL_PollEvent(&event)){
 		switch (event.type){
-		case SDL_QUIT:
+			case SDL_QUIT:
 			exit(EXIT_SUCCESS);
-		case SDL_KEYDOWN:
+			case SDL_KEYDOWN:
 			switch(event.key.keysym.sym){
-			case SDLK_ESCAPE:
-			case SDLK_q:
+				case SDLK_ESCAPE:
+				case SDLK_q:
 				exit(EXIT_SUCCESS);
 			case SDLK_w: case SDLK_UP:	// move paddle up
-				if (modelP[1][3] < CeilingY - FloatImprecisionFactor) {
-					modelP = modelP * Translate(0.0,1.0,0.0);
-				}
-				break;
-			case SDLK_s: case SDLK_DOWN:	// move paddle down;
-				if (modelP[1][3] > FloorY + FloatImprecisionFactor) {
-					modelP = modelP * Translate(0.0,-1.0,0.0);
-				}
-				break;
-			case SDLK_d: case SDLK_RIGHT:	// move paddle right;
-				if (modelP[0][3] < RightWallX - FloatImprecisionFactor) {
-					modelP = modelP * Translate(1.0,0.0,0.0);
-				}
-				break;
-			case SDLK_a: case SDLK_LEFT:	// move paddle left;
-				if (modelP[0][3] > LeftWallX + FloatImprecisionFactor) {
-					modelP = modelP * Translate(-1.0,0.0,0.0);
-				}
-				break;
-			case SDLK_r://new game
-				resetGame();
-				break;
+			if (modelP[1][3] < CeilingY - FloatImprecisionFactor) {
+				modelP = modelP * Translate(0.0,1.0,0.0);
 			}
+			break;
+			case SDLK_s: case SDLK_DOWN:	// move paddle down;
+			if (modelP[1][3] > FloorY + FloatImprecisionFactor) {
+				modelP = modelP * Translate(0.0,-1.0,0.0);
+			}
+			break;
+			case SDLK_d: case SDLK_RIGHT:	// move paddle right;
+			if (modelP[0][3] < RightWallX - FloatImprecisionFactor) {
+				modelP = modelP * Translate(1.0,0.0,0.0);
+			}
+			break;
+			case SDLK_a: case SDLK_LEFT:	// move paddle left;
+			if (modelP[0][3] > LeftWallX + FloatImprecisionFactor) {
+				modelP = modelP * Translate(-1.0,0.0,0.0);
+			}
+			break;
+			case SDLK_r://new game
+			resetGame();
+			break;
+		}
 		case SDL_MOUSEMOTION:
-			float MouseMotionFactor = 26.0;
+		float MouseMotionFactor = 26.0;
 
-			static int prevMouseX = event.motion.x;
-			static int prevMouseY = event.motion.y;
+		static int prevMouseX = event.motion.x;
+		static int prevMouseY = event.motion.y;
 
-			int mouseX = event.motion.x, mouseY = event.motion.y;
+		int mouseX = event.motion.x, mouseY = event.motion.y;
 
-			float proposedMoveX = (mouseX - prevMouseX)/MouseMotionFactor;
-			float proposedMoveY = -(mouseY - prevMouseY)/MouseMotionFactor;
+		float proposedMoveX = (mouseX - prevMouseX)/MouseMotionFactor;
+		float proposedMoveY = -(mouseY - prevMouseY)/MouseMotionFactor;
 
-			vec3 translationVec3(0.0,0.0,0.0);
+		vec3 translationVec3(0.0,0.0,0.0);
 
 			// Control Paddle movement on X axis
-			if(modelP[0][3] + proposedMoveX < RightWallX &&
-				modelP[0][3] + proposedMoveX > LeftWallX){
-				translationVec3.x = translationVec3.x + proposedMoveX;
-			}
+		if(modelP[0][3] + proposedMoveX < RightWallX &&
+			modelP[0][3] + proposedMoveX > LeftWallX){
+			translationVec3.x = translationVec3.x + proposedMoveX;
+	}
 
 			// Control Paddle movement on Y axis
-			if(modelP[1][3] + proposedMoveY < CeilingY &&
-				modelP[1][3] + proposedMoveY > FloorY){
-				translationVec3.y = translationVec3.y + proposedMoveY;
-			}
+	if(modelP[1][3] + proposedMoveY < CeilingY &&
+		modelP[1][3] + proposedMoveY > FloorY){
+		translationVec3.y = translationVec3.y + proposedMoveY;
+}
 
 			//std::cout<<"Current X="<<modelP[0][3]+PaddleWidth/2+proposedMoveX<<std::endl;
 			//std::cout<<"Proposed final X (right)="<<modelP[0][3]+PaddleWidth/2+proposedMoveX<<std::endl;
@@ -507,15 +553,15 @@ void input(SDL_Window* screen){
 			//printMat4(modelP);
 
 			// Set up previous mouse coordinates for next MouseMotion event
-			prevMouseX = mouseX;
-			prevMouseY = mouseY;
+prevMouseX = mouseX;
+prevMouseY = mouseY;
 
 			// Move the paddle accordingly
-			modelP = modelP * Translate(translationVec3);
+modelP = modelP * Translate(translationVec3);
 
-			break;
-		}
-	}
+break;
+}
+}
 }
 
 //----------------------------------------------------------------------------
@@ -550,9 +596,9 @@ void updateCollision(){
 		//std::cout<<"Collision with paddle"<<std::endl;
 		// Set collision info
 		collision.isColliding=true;
-		collision.isComingFromPaddle=true;
-		collision.locationX = ballPos.x - paddlePos.x;
-		collision.locationY = ballPos.y - paddlePos.y;
+	collision.isComingFromPaddle=true;
+	collision.locationX = ballPos.x - paddlePos.x;
+	collision.locationY = ballPos.y - paddlePos.y;
 	} // If collision with back wall
 	else if (ballFz <= wallPos.z && collision.isComingFromPaddle) {
 		//std::cout<<"Collision with back wall"<<std::endl;
@@ -579,16 +625,16 @@ void updateCollision(){
 
 		//std::cout<<"Collision with left/right wall"<<std::endl;
 		ballVel.x = -ballVel.x;
-	}
+}
 
 	// Check for floor/ceiling collision
-	if ((ballBy <= LeftWallX && ballVel.y < 0) ||
-		(ballTy >= RightWallX && ballVel.y > 0)){
+if ((ballBy <= LeftWallX && ballVel.y < 0) ||
+	(ballTy >= RightWallX && ballVel.y > 0)){
 
 		//std::cout<<"Collision with floor/ceiling"<<std::endl;
 		//printMat4(modelB);
-		ballVel.y = -ballVel.y;
-	}
+	ballVel.y = -ballVel.y;
+}
 }
 
 //----------------------------------------------------------------------------
